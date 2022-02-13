@@ -93,7 +93,7 @@ async fn modbus_client(tty_path: &str) -> Option<tokio_modbus::client::Context> 
 
 async fn read_state(ctx: &mut Context) -> MeasuredState {
     let mut state = vec![];
-    match ctx.read_holding_registers(0x07D0, 3).await {
+    let valid = match ctx.read_holding_registers(0x07D0, 3).await {
         Ok(response) => {
             response.iter().for_each(|x| {
                 state.push((x & 0xFF00).rotate_right(8));
@@ -112,7 +112,7 @@ async fn read_state(ctx: &mut Context) -> MeasuredState {
     };
 
     MeasuredState {
-        valid: true,
+        valid,
         g_act: (state[0] as u8 >> 0) & 0x01,
         g_gto: (state[0] as u8 >> 3) & 0x01,
         g_sta: (state[0] as u8 >> 4) & 0x03,
