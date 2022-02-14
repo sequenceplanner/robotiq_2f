@@ -7,6 +7,7 @@ use std::cmp::*;
 use tokio_modbus::client::Context;
 use tokio_modbus::prelude::*;
 use tokio_serial::SerialStream;
+// use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Default)]
 struct MeasuredState {
@@ -34,9 +35,9 @@ struct CommandState {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    
     let ctx = r2r::Context::create()?;
     let mut node = r2r::Node::create(ctx, "robotiq_2f_driver", "")?;
-
     let subscriber = node.subscribe::<CommandMsg>("/robotiq_2f_command", QosProfile::default())?;
     let pub_timer = node.create_wall_timer(std::time::Duration::from_millis(10))?;
     let publisher =
@@ -44,17 +45,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let tty_path = "/dev/ttyUSB0";
 
+    let handle = std::thread::spawn(move || loop {
+        node.spin_once(std::time::Duration::from_millis(100));
+    });
+
+    // can't work, ctx is not send...
+
+    // let client = Arc::new(Mutex::new(modbus_client(tty_path).await.unwrap()));
+    // let client_clone_1 = client.clone();
+    // let client_clone_2 = client.clone();
+    // let client_clone_3 = client.clone();
+
+    // try 1: initialize_on_startup(client_clone_1).await;
+    // let asdf = tokio::task::spawn(async move {
+    //     match publisher_callback(publisher, client_clone_2, pub_timer).await {
+    //         Ok(()) => (),
+    //         Err(e) => r2r::log_error!("robotiq_2f_driver", "Publisher failed with {}.", e),
+    //     };
+    // });
+    // tokio::task::spawn(async move {
+    //     match subscriber_callback(subscriber, client_clone_3).await {
+    //         Ok(()) => (),
+    //         Err(e) => r2r::log_error!("robotiq_2f_driver", "Subscriber failed with {}.", e),
+    //     };
+    // });
+
+
+    // need one task with the client, and that one should constantly read/write
+    // and the measured and command states are going through the arcs?
+
+
+    // try 2: doesn't work, can't have pub and sub in one task...
     match modbus_client(tty_path).await {
         Some(mut client) => {
-            initialize_on_startup(&mut client).await;
+            initialize_on_startup( &mut client).await;
             tokio::task::spawn(async move {
-                match publisher_callback(publisher, &mut client, pub_timer).await {
-                    Ok(()) => println!("done."),
-                    Err(e) => println!("error: {}", e),
-                };
                 match subscriber_callback(subscriber, &mut client).await {
-                    Ok(()) => println!("done."),
-                    Err(e) => println!("error: {}", e),
+                    Ok(()) => (),
+                    Err(e) => r2r::log_error!("robotiq_2f_driver", "Subscriber failed with {}.", e),
+                };
+                match publisher_callback(publisher, &mut client, pub_timer).await {
+                    Ok(()) => (),
+                    Err(e) => r2r::log_error!("robotiq_2f_driver", "Publisher failed with {}.", e),
                 };
             });
         }
@@ -66,10 +98,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     }
-
-    let handle = std::thread::spawn(move || loop {
-        node.spin_once(std::time::Duration::from_millis(100));
-    });
 
     handle.join().unwrap();
 
@@ -181,7 +209,14 @@ async fn normalize_command_state(command: CommandState) -> CommandState {
 async fn write_state(ctx: &mut Context, command: CommandState) -> () {
     match build_command_state(command).await {
         Some(state) => match ctx.write_multiple_registers(0x03E8, &state).await {
-            Ok(()) => (),
+            Ok(()) => {
+                r2r::log_info!(
+                    "robotiq_2f_driver",
+                    "Command state written: {:?}.",
+                    command
+                );
+                ()
+            },
             Err(e) => {
                 r2r::log_warn!(
                     "robotiq_2f_driver",
@@ -196,6 +231,31 @@ async fn write_state(ctx: &mut Context, command: CommandState) -> () {
             ()
         }
     }
+}
+
+async fn command_msg_to_state(msg: CommandMsg) -> CommandState {
+    let r_pr = match msg.use_high_level {
+        true => match msg.command.as_str() {
+            "open" => 0,
+            "close" => 255,
+            _ => {
+                r2r::log_warn!("robotiq_2f_driver", "Command: {} is invalid.", msg.command);
+                0
+            },
+        },
+        false => 0,
+    };
+
+    CommandState {
+        r_act: if msg.use_high_level {1} else {msg.r_act},
+        r_gto: if msg.use_high_level {1} else {msg.r_gto},
+        r_atr: if msg.use_high_level {0} else {msg.r_atr},
+        r_ard: if msg.use_high_level {0} else {msg.r_ard},
+        r_pr: if msg.use_high_level {r_pr} else {msg.r_pr},
+        r_sp: if msg.use_high_level {255} else {msg.r_sp},
+        r_fr: if msg.use_high_level {150} else {msg.r_fr},
+    }
+
 }
 
 async fn build_command_state(command: CommandState) -> Option<[u16; 3]> {
@@ -224,7 +284,10 @@ async fn build_command_state(command: CommandState) -> Option<[u16; 3]> {
         Some([a, b, c, d, e, f]) => match (a as u16).rotate_right(8).checked_add(b as u16) {
             Some(reg_1) => match (c as u16).rotate_right(8).checked_add(d as u16) {
                 Some(reg_2) => match (e as u16).rotate_right(8).checked_add(f as u16) {
-                    Some(reg_3) => Some([reg_1, reg_2, reg_3]),
+                    Some(reg_3) => {
+                        println!("witing command state {:?}", command);
+                        Some([reg_1, reg_2, reg_3])
+                    },
                     None => {
                         r2r::log_warn!(
                             "robotiq_2f_driver",
@@ -265,6 +328,7 @@ async fn initialize_on_startup(ctx: &mut Context) -> () {
         ..Default::default()
     };
 
+    // write_state(&mut *ctx.lock().unwrap(), reset_state).await;
     write_state(ctx, reset_state).await;
 
     let active_state = CommandState {
@@ -275,11 +339,13 @@ async fn initialize_on_startup(ctx: &mut Context) -> () {
         ..Default::default()
     };
 
+    // write_state(&mut *ctx.lock().unwrap(), active_state).await;
     write_state(ctx, active_state).await;
 }
 
 async fn publisher_callback(
     publisher: r2r::Publisher<MeasuredMsg>,
+    // ctx: Arc<Mutex<Context>>,
     ctx: &mut Context,
     mut timer: r2r::Timer,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -297,21 +363,28 @@ async fn publisher_callback(
             }
         };
         timer.tick().await?;
+        timer.tick().await?;
     }
 }
 
 async fn subscriber_callback(
     mut subscriber: impl Stream<Item = CommandMsg> + Unpin,
+    // ctx: Arc<Mutex<Context>>,
     ctx: &mut Context,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // loop {
-    match subscriber.next().await {
-        Some(msg) => {
-            println!("asdf")
+    loop{
+        match subscriber.next().await {
+            Some(msg) => {
+                let state = command_msg_to_state(msg).await;
+                write_state(ctx, state).await;
+            }
+            None => {
+                r2r::log_error!(
+                    "robotiq_2f_driver",
+                    "Subscriber did not get the message?",
+                );
+                ()
+            },
         }
-        None => (),
     }
-    // }
-
-    Ok(())
 }

@@ -20,7 +20,8 @@ r2r_cargo(std_msgs               # just to test that it works
 
 # install binaries
 install(PROGRAMS
-  ${CMAKE_SOURCE_DIR}/target/release/${PROJECT_NAME}
+  ${CMAKE_SOURCE_DIR}/target/release/driver
+  ${CMAKE_SOURCE_DIR}/target/release/manual
   DESTINATION lib/${PROJECT_NAME}
 )
 
