@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="2">
+  <name>robotiq_2f_driver</name>
+  <version>0.0.1</version>
+  <description>
+    Robotiq 2f Gripper Driver
+  </description>
+
+  <author>Endre Erős</author>
+  <author email="endree@chalmers.se">Endre Erős</author>
+
+  <maintainer email="endree@chalmers.se">endre_eros</maintainer>
+
+  <license>no_license</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>rcl</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>robotiq_2f_msgs</build_depend>
+
+  <exec_depend>rcl</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>robotiq_2f_msgs</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

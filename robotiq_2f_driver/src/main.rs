@@ -1,5 +1,9 @@
+use futures::stream::Stream;
+use futures::stream::StreamExt;
+use r2r::robotiq_2f_msgs::msg::CommandState as CommandMsg;
+use r2r::robotiq_2f_msgs::msg::MeasuredState as MeasuredMsg;
+use r2r::QosProfile;
 use std::cmp::*;
-use std::{thread, time};
 use tokio_modbus::client::Context;
 use tokio_modbus::prelude::*;
 use tokio_serial::SerialStream;
@@ -33,21 +37,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = r2r::Context::create()?;
     let mut node = r2r::Node::create(ctx, "robotiq_2f_driver", "")?;
 
-    let handle = std::thread::spawn(move || loop {
-        node.spin_once(std::time::Duration::from_millis(100));
-    });
+    let subscriber = node.subscribe::<CommandMsg>("/robotiq_2f_command", QosProfile::default())?;
+    let pub_timer = node.create_wall_timer(std::time::Duration::from_millis(10))?;
+    let publisher =
+        node.create_publisher::<MeasuredMsg>("/robotiq_2f_measured", QosProfile::default())?;
 
     let tty_path = "/dev/ttyUSB0";
 
     match modbus_client(tty_path).await {
         Some(mut client) => {
+            initialize_on_startup(&mut client).await;
             tokio::task::spawn(async move {
-                initialize_on_startup(&mut client).await;
-                loop {
-                    println!("{:?}", read_state(&mut client).await);
-                    thread::sleep(time::Duration::from_millis(10));
-                    // write_state(&mut client, active_state).await;
-                }
+                match publisher_callback(publisher, &mut client, pub_timer).await {
+                    Ok(()) => println!("done."),
+                    Err(e) => println!("error: {}", e),
+                };
+                match subscriber_callback(subscriber, &mut client).await {
+                    Ok(()) => println!("done."),
+                    Err(e) => println!("error: {}", e),
+                };
             });
         }
         None => {
@@ -59,13 +67,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    let handle = std::thread::spawn(move || loop {
+        node.spin_once(std::time::Duration::from_millis(100));
+    });
+
     handle.join().unwrap();
 
     Ok(())
 }
 
 async fn modbus_client(tty_path: &str) -> Option<tokio_modbus::client::Context> {
-    let tty_path = tty_path.to_string();
     let builder = tokio_serial::new(tty_path, 115200);
     let port = SerialStream::open(&builder);
     match port {
@@ -121,6 +132,37 @@ async fn read_state(ctx: &mut Context) -> MeasuredState {
         g_pr: state[3] as u8,
         g_po: state[4] as u8,
         g_cu: state[5] as u8,
+    }
+}
+
+async fn build_measured_msg(state: &MeasuredState) -> MeasuredMsg {
+    let measured = match state.g_gto {
+        0 => "unknown",
+        1 => match state.g_flt {
+            0 => match state.g_obj {
+                0 | 3 => match state.g_po {
+                    x if x < 10 => "opened",
+                    x if x > 240 => "closed",
+                    _ => "unknown",
+                },
+                1 | 2 => "gripping",
+                _ => "unknown",
+            },
+            _ => "fault",
+        },
+        _ => "unknown",
+    };
+
+    MeasuredMsg {
+        measured: measured.to_string(),
+        g_act: state.g_act,
+        g_gto: state.g_gto,
+        g_sta: state.g_sta,
+        g_obj: state.g_obj,
+        g_flt: state.g_flt,
+        g_pr: state.g_pr,
+        g_po: state.g_po,
+        g_cu: state.g_cu,
     }
 }
 
@@ -234,4 +276,42 @@ async fn initialize_on_startup(ctx: &mut Context) -> () {
     };
 
     write_state(ctx, active_state).await;
+}
+
+async fn publisher_callback(
+    publisher: r2r::Publisher<MeasuredMsg>,
+    ctx: &mut Context,
+    mut timer: r2r::Timer,
+) -> Result<(), Box<dyn std::error::Error>> {
+    loop {
+        let state = read_state(ctx).await;
+        let msg = build_measured_msg(&state).await;
+        match publisher.publish(&msg) {
+            Ok(()) => (),
+            Err(e) => {
+                r2r::log_error!(
+                    "robotiq_2f_driver",
+                    "Publisher failed to send a message with: {}",
+                    e
+                );
+            }
+        };
+        timer.tick().await?;
+    }
+}
+
+async fn subscriber_callback(
+    mut subscriber: impl Stream<Item = CommandMsg> + Unpin,
+    ctx: &mut Context,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // loop {
+    match subscriber.next().await {
+        Some(msg) => {
+            println!("asdf")
+        }
+        None => (),
+    }
+    // }
+
+    Ok(())
 }
