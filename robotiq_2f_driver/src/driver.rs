@@ -4,22 +4,22 @@ use r2r::robotiq_2f_msgs::msg::CommandState as CommandMsg;
 use r2r::robotiq_2f_msgs::msg::MeasuredState as MeasuredMsg;
 use r2r::QosProfile;
 use std::cmp::*;
+use std::sync::{Arc, Mutex};
+use std::{thread, time};
 use tokio_modbus::client::Context;
 use tokio_modbus::prelude::*;
 use tokio_serial::SerialStream;
-// use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 struct MeasuredState {
-    pub valid: bool, // some unwrap failed, disregard state
-    pub g_act: u8,   // activation status
-    pub g_gto: u8,   // action status
-    pub g_sta: u8,   // gripper status
-    pub g_obj: u8,   // object detection status
-    pub g_flt: u8,   // fault status
-    pub g_pr: u8,    // position request echo
-    pub g_po: u8,    // position
-    pub g_cu: u8,    // current
+    pub g_act: u8, // activation status
+    pub g_gto: u8, // action status
+    pub g_sta: u8, // gripper status
+    pub g_obj: u8, // object detection status
+    pub g_flt: u8, // fault status
+    pub g_pr: u8,  // position request echo
+    pub g_po: u8,  // position
+    pub g_cu: u8,  // current
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -35,7 +35,6 @@ struct CommandState {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    
     let ctx = r2r::Context::create()?;
     let mut node = r2r::Node::create(ctx, "robotiq_2f_driver", "")?;
     let subscriber = node.subscribe::<CommandMsg>("/robotiq_2f_command", QosProfile::default())?;
@@ -45,78 +44,70 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let tty_path = "/dev/ttyUSB0";
 
+    let msr_state = Arc::new(Mutex::new(MeasuredState::default()));
+    let msr_state_clone_1 = msr_state.clone();
+    let msr_state_clone_2 = msr_state.clone();
+
+    let cmd_state = Arc::new(Mutex::new(CommandState::default()));
+    let cmd_state_clone_1 = cmd_state.clone();
+    let cmd_state_clone_2 = cmd_state.clone();
+    let cmd_state_clone_3 = cmd_state.clone();
+    let cmd_state_clone_4 = cmd_state.clone();
+
+    tokio::task::spawn(async move {
+        modbus_client(tty_path, msr_state_clone_1, cmd_state_clone_3).await;
+    });
+
+    reset_on_startup(cmd_state_clone_1).await;
+    activate_on_startup(cmd_state_clone_2).await;
+
+    tokio::task::spawn(async move {
+        match publisher_callback(publisher, pub_timer, msr_state_clone_2).await {
+            Ok(()) => (),
+            Err(e) => r2r::log_error!("robotiq_2f_driver", "Publisher failed with {}.", e),
+        };
+    });
+
+    tokio::task::spawn(async move {
+        match subscriber_callback(subscriber, cmd_state_clone_4).await {
+            Ok(()) => (),
+            Err(e) => r2r::log_error!("robotiq_2f_driver", "Publisher failed with {}.", e),
+        };
+    });
+
     let handle = std::thread::spawn(move || loop {
         node.spin_once(std::time::Duration::from_millis(100));
     });
-
-    // can't work, ctx is not send...
-
-    // let client = Arc::new(Mutex::new(modbus_client(tty_path).await.unwrap()));
-    // let client_clone_1 = client.clone();
-    // let client_clone_2 = client.clone();
-    // let client_clone_3 = client.clone();
-
-    // try 1: initialize_on_startup(client_clone_1).await;
-    // let asdf = tokio::task::spawn(async move {
-    //     match publisher_callback(publisher, client_clone_2, pub_timer).await {
-    //         Ok(()) => (),
-    //         Err(e) => r2r::log_error!("robotiq_2f_driver", "Publisher failed with {}.", e),
-    //     };
-    // });
-    // tokio::task::spawn(async move {
-    //     match subscriber_callback(subscriber, client_clone_3).await {
-    //         Ok(()) => (),
-    //         Err(e) => r2r::log_error!("robotiq_2f_driver", "Subscriber failed with {}.", e),
-    //     };
-    // });
-
-
-    // need one task with the client, and that one should constantly read/write
-    // and the measured and command states are going through the arcs?
-
-
-    // try 2: doesn't work, can't have pub and sub in one task...
-    match modbus_client(tty_path).await {
-        Some(mut client) => {
-            initialize_on_startup( &mut client).await;
-            tokio::task::spawn(async move {
-                match subscriber_callback(subscriber, &mut client).await {
-                    Ok(()) => (),
-                    Err(e) => r2r::log_error!("robotiq_2f_driver", "Subscriber failed with {}.", e),
-                };
-                match publisher_callback(publisher, &mut client, pub_timer).await {
-                    Ok(()) => (),
-                    Err(e) => r2r::log_error!("robotiq_2f_driver", "Publisher failed with {}.", e),
-                };
-            });
-        }
-        None => {
-            r2r::log_error!(
-                "robotiq_2f_driver",
-                "Gripper couldn't connect to path: {}",
-                tty_path,
-            );
-        }
-    }
 
     handle.join().unwrap();
 
     Ok(())
 }
 
-async fn modbus_client(tty_path: &str) -> Option<tokio_modbus::client::Context> {
+async fn modbus_client(
+    tty_path: &str,
+    msr: Arc<Mutex<MeasuredState>>,
+    cmd: Arc<Mutex<CommandState>>,
+) -> () {
+    //Option<tokio_modbus::client::Context> {
     let builder = tokio_serial::new(tty_path, 115200);
     let port = SerialStream::open(&builder);
     match port {
         Ok(stream) => match rtu::connect_slave(stream, Slave(0x0009)).await {
-            Ok(ctx) => Some(ctx),
+            Ok(mut ctx) => {
+                loop {
+                    read_state(&mut ctx, &msr).await;
+                    // println!("State to be written: {:?}", cmd);
+                    write_state(&mut ctx, &cmd).await;
+                }
+            }
             Err(e) => {
                 r2r::log_error!(
                     "robotiq_2f_driver",
                     "RTU connecting to slave failed with {}.",
                     e
                 );
-                None
+                ()
             }
         },
         Err(e) => {
@@ -125,20 +116,29 @@ async fn modbus_client(tty_path: &str) -> Option<tokio_modbus::client::Context> 
                 "Serial port builder failed with {}.",
                 e
             );
-            None
+            ()
         }
     }
 }
 
-async fn read_state(ctx: &mut Context) -> MeasuredState {
-    let mut state = vec![];
-    let valid = match ctx.read_holding_registers(0x07D0, 3).await {
+async fn read_state(ctx: &mut Context, msr: &Arc<Mutex<MeasuredState>>) -> () {
+    match ctx.read_holding_registers(0x07D0, 3).await {
         Ok(response) => {
+            let mut state = vec![];
             response.iter().for_each(|x| {
                 state.push((x & 0xFF00).rotate_right(8));
                 state.push(x & 0x00FF)
             });
-            true
+            *msr.lock().unwrap() = MeasuredState {
+                g_act: (state[0] as u8 >> 0) & 0x01,
+                g_gto: (state[0] as u8 >> 3) & 0x01,
+                g_sta: (state[0] as u8 >> 4) & 0x03,
+                g_obj: (state[0] as u8 >> 6) & 0x03,
+                g_flt: state[2] as u8,
+                g_pr: state[3] as u8,
+                g_po: state[4] as u8,
+                g_cu: state[5] as u8,
+            };
         }
         Err(e) => {
             r2r::log_warn!(
@@ -146,31 +146,19 @@ async fn read_state(ctx: &mut Context) -> MeasuredState {
                 "Reading the holding registers failed with {}.",
                 e
             );
-            false
         }
     };
-
-    MeasuredState {
-        valid,
-        g_act: (state[0] as u8 >> 0) & 0x01,
-        g_gto: (state[0] as u8 >> 3) & 0x01,
-        g_sta: (state[0] as u8 >> 4) & 0x03,
-        g_obj: (state[0] as u8 >> 6) & 0x03,
-        g_flt: state[2] as u8,
-        g_pr: state[3] as u8,
-        g_po: state[4] as u8,
-        g_cu: state[5] as u8,
-    }
 }
 
-async fn build_measured_msg(state: &MeasuredState) -> MeasuredMsg {
+async fn build_measured_msg(msr: &Arc<Mutex<MeasuredState>>) -> MeasuredMsg {
+    let state = *msr.lock().unwrap();
     let measured = match state.g_gto {
         0 => "unknown",
         1 => match state.g_flt {
             0 => match state.g_obj {
                 0 | 3 => match state.g_po {
                     x if x < 10 => "opened",
-                    x if x > 240 => "closed",
+                    x if x > 220 => "closed",
                     _ => "unknown",
                 },
                 1 | 2 => "gripping",
@@ -194,7 +182,8 @@ async fn build_measured_msg(state: &MeasuredState) -> MeasuredMsg {
     }
 }
 
-async fn normalize_command_state(command: CommandState) -> CommandState {
+async fn normalize_command_state(cmd: &Arc<Mutex<CommandState>>) -> CommandState {
+    let command = *cmd.lock().unwrap();
     CommandState {
         r_act: min(max(command.r_act, 0), 1),
         r_gto: min(max(command.r_gto, 0), 1),
@@ -206,17 +195,13 @@ async fn normalize_command_state(command: CommandState) -> CommandState {
     }
 }
 
-async fn write_state(ctx: &mut Context, command: CommandState) -> () {
-    match build_command_state(command).await {
+async fn write_state(ctx: &mut Context, cmd: &Arc<Mutex<CommandState>>) -> () {
+    match build_command_state(&cmd).await {
         Some(state) => match ctx.write_multiple_registers(0x03E8, &state).await {
             Ok(()) => {
-                r2r::log_info!(
-                    "robotiq_2f_driver",
-                    "Command state written: {:?}.",
-                    command
-                );
+                // r2r::log_info!("robotiq_2f_driver", "Command state written: {:?}.", command);
                 ()
-            },
+            }
             Err(e) => {
                 r2r::log_warn!(
                     "robotiq_2f_driver",
@@ -233,7 +218,7 @@ async fn write_state(ctx: &mut Context, command: CommandState) -> () {
     }
 }
 
-async fn command_msg_to_state(msg: CommandMsg) -> CommandState {
+async fn command_msg_to_state(msg: CommandMsg, state: &Arc<Mutex<CommandState>>) -> () {
     let r_pr = match msg.use_high_level {
         true => match msg.command.as_str() {
             "open" => 0,
@@ -241,25 +226,24 @@ async fn command_msg_to_state(msg: CommandMsg) -> CommandState {
             _ => {
                 r2r::log_warn!("robotiq_2f_driver", "Command: {} is invalid.", msg.command);
                 0
-            },
+            }
         },
         false => 0,
     };
 
-    CommandState {
-        r_act: if msg.use_high_level {1} else {msg.r_act},
-        r_gto: if msg.use_high_level {1} else {msg.r_gto},
-        r_atr: if msg.use_high_level {0} else {msg.r_atr},
-        r_ard: if msg.use_high_level {0} else {msg.r_ard},
-        r_pr: if msg.use_high_level {r_pr} else {msg.r_pr},
-        r_sp: if msg.use_high_level {255} else {msg.r_sp},
-        r_fr: if msg.use_high_level {150} else {msg.r_fr},
+    *state.lock().unwrap() = CommandState {
+        r_act: if msg.use_high_level { 1 } else { msg.r_act },
+        r_gto: if msg.use_high_level { 1 } else { 1 }, //{ msg.r_gto },
+        r_atr: if msg.use_high_level { 0 } else { msg.r_atr },
+        r_ard: if msg.use_high_level { 0 } else { msg.r_ard },
+        r_pr: if msg.use_high_level { r_pr } else { msg.r_pr },
+        r_sp: if msg.use_high_level { 255 } else { msg.r_sp },
+        r_fr: if msg.use_high_level { 150 } else { msg.r_fr },
     }
-
 }
 
-async fn build_command_state(command: CommandState) -> Option<[u16; 3]> {
-    let norm = normalize_command_state(command).await;
+async fn build_command_state(cmd: &Arc<Mutex<CommandState>>) -> Option<[u16; 3]> {
+    let norm = normalize_command_state(&cmd).await;
     let bytes_msg = match norm.r_act.checked_add(norm.r_gto << 3) {
         Some(pre_x) => match pre_x.checked_add(norm.r_atr << 4) {
             Some(x) => Some([x, 0, 0, norm.r_pr, norm.r_sp, norm.r_fr]),
@@ -285,9 +269,9 @@ async fn build_command_state(command: CommandState) -> Option<[u16; 3]> {
             Some(reg_1) => match (c as u16).rotate_right(8).checked_add(d as u16) {
                 Some(reg_2) => match (e as u16).rotate_right(8).checked_add(f as u16) {
                     Some(reg_3) => {
-                        println!("witing command state {:?}", command);
+                        // println!("witing command state {:?}", *cmd.lock().unwrap());
                         Some([reg_1, reg_2, reg_3])
-                    },
+                    }
                     None => {
                         r2r::log_warn!(
                             "robotiq_2f_driver",
@@ -322,15 +306,17 @@ async fn build_command_state(command: CommandState) -> Option<[u16; 3]> {
     }
 }
 
-async fn initialize_on_startup(ctx: &mut Context) -> () {
+async fn reset_on_startup(cmd: Arc<Mutex<CommandState>>) -> () {
     let reset_state = CommandState {
         r_act: 0,
         ..Default::default()
     };
 
-    // write_state(&mut *ctx.lock().unwrap(), reset_state).await;
-    write_state(ctx, reset_state).await;
+    *cmd.lock().unwrap() = reset_state;
+    thread::sleep(time::Duration::from_millis(500));
+}
 
+async fn activate_on_startup(cmd: Arc<Mutex<CommandState>>) -> () {
     let active_state = CommandState {
         r_act: 1,
         r_gto: 1,
@@ -339,19 +325,18 @@ async fn initialize_on_startup(ctx: &mut Context) -> () {
         ..Default::default()
     };
 
-    // write_state(&mut *ctx.lock().unwrap(), active_state).await;
-    write_state(ctx, active_state).await;
+    *cmd.lock().unwrap() = active_state;
+
+    thread::sleep(time::Duration::from_millis(500));
 }
 
 async fn publisher_callback(
     publisher: r2r::Publisher<MeasuredMsg>,
-    // ctx: Arc<Mutex<Context>>,
-    ctx: &mut Context,
     mut timer: r2r::Timer,
+    msr: Arc<Mutex<MeasuredState>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
-        let state = read_state(ctx).await;
-        let msg = build_measured_msg(&state).await;
+        let msg = build_measured_msg(&msr).await;
         match publisher.publish(&msg) {
             Ok(()) => (),
             Err(e) => {
@@ -363,28 +348,23 @@ async fn publisher_callback(
             }
         };
         timer.tick().await?;
-        timer.tick().await?;
+        // timer.tick().await?;
     }
 }
 
 async fn subscriber_callback(
     mut subscriber: impl Stream<Item = CommandMsg> + Unpin,
-    // ctx: Arc<Mutex<Context>>,
-    ctx: &mut Context,
+    cmd: Arc<Mutex<CommandState>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    loop{
+    loop {
         match subscriber.next().await {
             Some(msg) => {
-                let state = command_msg_to_state(msg).await;
-                write_state(ctx, state).await;
+                command_msg_to_state(msg, &cmd).await;
             }
             None => {
-                r2r::log_error!(
-                    "robotiq_2f_driver",
-                    "Subscriber did not get the message?",
-                );
+                r2r::log_error!("robotiq_2f_driver", "Subscriber did not get the message?",);
                 ()
-            },
+            }
         }
     }
 }
