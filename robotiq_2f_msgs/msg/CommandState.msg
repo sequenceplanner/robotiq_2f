@@ -4,7 +4,7 @@
 # Force: 50%
 # true => high level will be used
 # false => low level will be used
-bool use_high_level
+bool use_high_level true
 
 # High level output mapping
 string command  # [open, close]
