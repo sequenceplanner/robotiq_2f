@@ -1,25 +1,27 @@
 FROM kristoferb/spbase_ros2:galactic as build
 
+ARG project_name=robotiq_2f_driver
+
 # install any deps here and clone any external repos into the workspace
+COPY ./robotiq_2f_msgs/ /build/src/robotiq_2f_msgs
 
 # Copy the packages and only the rust package and cargo files to build the rust deps.
-COPY ./robotiq_2f_msgs/ /build/src/robotiq_2f_msgs
-COPY ./robotiq_2f_driver/Cargo.* \
-    ./robotiq_2f_driver/package.xml \
-    ./robotiq_2f_driver/r2r_cargo.cmake \
-    ./robotiq_2f_driver/CMakeLists.txt \
-    /build/src/robotiq_2f_driver/
+COPY ./$project_name/Cargo.* \
+    ./$project_name/package.xml \
+    ./$project_name/r2r_cargo.cmake \
+    ./$project_name/CMakeLists.txt \
+    /build/src/$project_name/
 RUN . /opt/ros/$ROS_DISTRO/setup.sh &&\
     cd /build &&\
-    mkdir ./src/robotiq_2f_driver/src/ &&\
-    echo "fn main() {}" > ./src/robotiq_2f_driver/src/main.rs &&\
+    mkdir ./src/$project_name/src/ &&\
+    echo "fn main() {}" > ./src/$project_name/src/main.rs &&\
     colcon build
 
 # Copy the rest of the rust code and colcon build again
-COPY ./robotiq_2f_driver/ /build/src/robotiq_2f_driver/
+COPY ./$project_name/ /build/src/$project_name/
 RUN . /opt/ros/$ROS_DISTRO/setup.sh &&\
     cd /build &&\
-    colcon build --packages-select robotiq_2f_driver
+    colcon build --packages-select $project_name
 
 
 # Create a new core image without build tools
