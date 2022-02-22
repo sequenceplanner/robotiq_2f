@@ -14,11 +14,14 @@ r2r_cargo(std_msgs               # just to test that it works
           rcl                    # we need the c ros2 api
           rcl_action
           robotiq_2f_msgs
+          rmw_fastrtps_cpp       # (needed to build with RMW_IMPLEMENTATION=rmw_fastrtps_cpp)
+          FastRTPS               # (needed to build with RMW_IMPLEMENTATION=rmw_fastrtps_cpp)
          )
 
 # install binaries
 install(PROGRAMS
-  ${CMAKE_SOURCE_DIR}/target/release/${PROJECT_NAME}
+  ${CMAKE_SOURCE_DIR}/target/release/driver
+  ${CMAKE_SOURCE_DIR}/target/release/manual
   DESTINATION lib/${PROJECT_NAME}
 )
 
