@@ -93,5 +93,5 @@ sudo docker build . --tag robotiq
 to run 
 
 ```
-sudo docker run -t -i --rm --device=/dev/ttyUSB0 --network host hej ros2 run robotiq_2f_driver robotiq_2f_driver
+sudo docker run -t -i --rm --device=/dev/ttyUSB0 --network host robotiq ros2 run robotiq_2f_driver robotiq_2f_driver
 ```

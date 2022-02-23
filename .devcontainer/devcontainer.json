@@ -1,0 +1,17 @@
+{
+    "name": "dev",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "dev",
+    "workspaceFolder": "/ws/",
+	"shutdownAction": "stopCompose",
+	"extensions": [
+		"ms-python.python",
+		"ms-vscode-remote.vscode-remote-extensionpack",
+		"matklad.rust-analyzer"
+	],
+	"settings": {
+		"rust-analyzer.linkedProjects": [
+			"/ws/src/robotiq_2f_driver/Cargo.toml"
+		]
+	}
+}

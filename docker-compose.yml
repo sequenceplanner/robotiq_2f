@@ -1,0 +1,12 @@
+services:
+  deploy:
+    build: 
+      context: ./
+      dockerfile: Dockerfile_deploy
+    command: ros2 run robotiq_2f_driver robotiq_2f_driver
+    devices:
+      - "dev/ttyUSB0" 
+    network_mode: host
+    volumes:
+      - ../robotiq_2f_driver/src:/ws/src/robotiq_2f_driver/src
+      

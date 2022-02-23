@@ -1,0 +1,9 @@
+services:
+  dev:
+    build: 
+      context: ../
+      dockerfile: Dockerfile_dev
+    command: tail -F anything
+    volumes:
+      - ../robotiq_2f_driver/src:/ws/src/robotiq_2f_driver/src
+      
