@@ -11,6 +11,7 @@ include(r2r_cargo.cmake)
 
 # put ros package dependencies here.
 r2r_cargo(std_msgs               # just to test that it works
+          std_srvs
           rcl                    # we need the c ros2 api
           rcl_action
           robotiq_2f_msgs

@@ -2,6 +2,7 @@ use futures::stream::Stream;
 use futures::stream::StreamExt;
 use r2r::robotiq_2f_msgs::msg::CommandState as CommandMsg;
 use r2r::robotiq_2f_msgs::msg::MeasuredState as MeasuredMsg;
+use r2r::std_srvs::srv::Trigger;
 use r2r::QosProfile;
 use std::cmp::*;
 use std::sync::{Arc, Mutex};
@@ -38,6 +39,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = r2r::Context::create()?;
     let mut node = r2r::Node::create(ctx, "robotiq_2f_driver", "")?;
     let subscriber = node.subscribe::<CommandMsg>("/robotiq_2f_command", QosProfile::default())?;
+    let mut open_service = node.create_service::<Trigger::Service>("/robotiq_2f_open")?;
+    let mut close_service = node.create_service::<Trigger::Service>("/robotiq_2f_close")?;
     let pub_timer = node.create_wall_timer(std::time::Duration::from_millis(10))?;
     let publisher =
         node.create_publisher::<MeasuredMsg>("/robotiq_2f_measured", QosProfile::default())?;
@@ -53,6 +56,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cmd_state_clone_2 = cmd_state.clone();
     let cmd_state_clone_3 = cmd_state.clone();
     let cmd_state_clone_4 = cmd_state.clone();
+    let cmd_state_clone_5 = cmd_state.clone();
+    let cmd_state_clone_6 = cmd_state.clone();
 
     tokio::task::spawn(async move {
         modbus_client(tty_path, msr_state_clone_1, cmd_state_clone_3).await;
@@ -73,6 +78,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(()) => (),
             Err(e) => r2r::log_error!("robotiq_2f_driver", "Publisher failed with {}.", e),
         };
+    });
+
+    tokio::task::spawn(async move {
+        loop {
+            if let Some(req) = open_service.next().await {
+                cmd_state_clone_5.lock().unwrap().r_pr = 0;
+                req.respond(Trigger::Response { success: true, message: "opened".into() })
+                    .expect("could not send service response");
+            }
+        }
+    });
+
+    tokio::task::spawn(async move {
+        loop {
+            if let Some(req) = close_service.next().await {
+                cmd_state_clone_6.lock().unwrap().r_pr = 255;
+                req.respond(Trigger::Response { success: true, message: "closed".into() })
+                    .expect("could not send service response");
+            }
+        }
     });
 
     let handle = std::thread::spawn(move || loop {

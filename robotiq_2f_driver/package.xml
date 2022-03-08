@@ -18,10 +18,12 @@
 
   <build_depend>rcl</build_depend>
   <build_depend>std_msgs</build_depend>
+  <build_depend>std_srvs</build_depend>
   <build_depend>robotiq_2f_msgs</build_depend>
 
   <exec_depend>rcl</exec_depend>
   <exec_depend>std_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
   <exec_depend>robotiq_2f_msgs</exec_depend>
 
   <export>
