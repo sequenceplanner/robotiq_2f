@@ -647,7 +647,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51dd4445360338dab5116712bee1388dc727991d51969558a8882ab552e6db30"
 
 [[package]]
-name = "robotiq_2f_driver"
+name = "robotiq_2f_driver_ui"
 version = "0.1.0"
 dependencies = [
  "chrono",

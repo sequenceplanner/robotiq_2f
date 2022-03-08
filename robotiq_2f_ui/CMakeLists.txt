@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(robotiq_2f_driver)
+project(robotiq_2f_driver_ui)
 
 find_package(ament_cmake REQUIRED)
 
@@ -20,8 +20,7 @@ r2r_cargo(std_msgs               # just to test that it works
 
 # install binaries
 install(PROGRAMS
-  ${CMAKE_SOURCE_DIR}/target/release/driver
-  ${CMAKE_SOURCE_DIR}/target/release/manual
+  ${CMAKE_SOURCE_DIR}/target/release/${PROJECT_NAME}
   DESTINATION lib/${PROJECT_NAME}
 )
 

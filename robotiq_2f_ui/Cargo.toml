@@ -1,5 +1,5 @@
 [package]
-name = "robotiq_2f_driver"
+name = "robotiq_2f_driver_ui"
 authors = ["Endre Erős <endree@chalmers.se>"]
 version = "0.1.0"
 edition = "2021"
