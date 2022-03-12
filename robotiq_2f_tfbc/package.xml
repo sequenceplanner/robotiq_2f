@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="2">
+  <name>robotiq_2f_tfbc</name>
+  <version>0.0.1</version>
+  <description>Test frame broadcaster.</description>
+  <maintainer email="endree@chalmers.se">Endre Erős</maintainer>
+  <license>no_license</license>
+  <author>Endre Erős</author>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>rcl</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>tool_handler_msgs</build_depend>
+  <build_depend>ur_tools_msgs</build_depend>
+  <build_depend>ur_script_msgs</build_depend>
+  <build_depend>tf_tools_msgs</build_depend>
+
+  <exec_depend>rcl</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>tool_handler_msgs</exec_depend>
+  <exec_depend>ur_tools_msgs</exec_depend>
+  <exec_depend>ur_script_msgs</exec_depend>
+  <exec_depend>tf_tools_msgs</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
