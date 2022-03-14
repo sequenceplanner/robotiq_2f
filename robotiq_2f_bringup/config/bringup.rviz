@@ -4,9 +4,6 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /Global Options1
-        - /TF1/Status1
-        - /RobotModel1/Status1
         - /RobotModel1/Description Topic1
       Splitter Ratio: 0.4079365134239197
     Tree Height: 644
@@ -54,9 +51,15 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
+        ghost_robotiq_2f_base_link:
+          Value: true
+        ghost_robotiq_2f_tcp:
+          Value: true
         left_inner_finger:
           Value: true
         left_inner_finger_pad:
+          Value: true
+        left_inner_knuckle:
           Value: true
         left_outer_finger:
           Value: true
@@ -65,6 +68,8 @@ Visualization Manager:
         right_inner_finger:
           Value: true
         right_inner_finger_pad:
+          Value: true
+        right_inner_knuckle:
           Value: true
         right_outer_finger:
           Value: true
@@ -76,19 +81,36 @@ Visualization Manager:
           Value: true
         world:
           Value: true
-      Marker Scale: 0.30000001192092896
+      Marker Scale: 0.10000000149011612
       Name: TF
       Show Arrows: false
       Show Axes: true
       Show Names: false
       Tree:
         world:
+          ghost_robotiq_2f_base_link:
+            ghost_robotiq_2f_tcp:
+              {}
           robotiq_2f_base_link:
+            left_inner_knuckle:
+              {}
+            left_outer_knuckle:
+              left_outer_finger:
+                left_inner_finger:
+                  left_inner_finger_pad:
+                    {}
+            right_inner_knuckle:
+              {}
+            right_outer_knuckle:
+              right_outer_finger:
+                right_inner_finger:
+                  right_inner_finger_pad:
+                    {}
             robotiq_2f_tcp:
               {}
       Update Interval: 0
       Value: true
-    - Alpha: 0.30000001192092896
+    - Alpha: 0.5
       Class: rviz_default_plugins/RobotModel
       Collision Enabled: false
       Description File: ""
@@ -98,7 +120,85 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /robot_description
+        Value: /robotiq/ghost/robot_description
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        left_inner_finger:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        left_inner_finger_pad:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        left_inner_knuckle:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        left_outer_finger:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        left_outer_knuckle:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_inner_finger:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_inner_finger_pad:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_inner_knuckle:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_outer_finger:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_outer_knuckle:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        robotiq_2f_base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+      Name: RobotModel
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
+    - Alpha: 1
+      Class: rviz_default_plugins/RobotModel
+      Collision Enabled: false
+      Description File: ""
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robotiq/robot_description
       Enabled: true
       Links:
         All Links Enabled: true
@@ -212,25 +312,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 0.7628769278526306
+      Distance: 0.3637246787548065
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.013370796106755733
-        Y: -0.00915510579943657
-        Z: 0.0455484576523304
+        X: 0.006568240467458963
+        Y: 0.00704735005274415
+        Z: 0.060372911393642426
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.2653990089893341
+      Pitch: 0.43539881706237793
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.220345973968506
+      Yaw: 3.670339822769165
     Saved: ~
 Window Geometry:
   Displays:
@@ -238,7 +338,7 @@ Window Geometry:
   Height: 941
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000002e20000030ffc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d0000030f000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000010f0000030ffc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003d0000030f000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000060f0000003efc0100000002fb0000000800540069006d006501000000000000060f000002eb00fffffffb0000000800540069006d00650100000000000004500000000000000000000002120000030f00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd0000000400000000000001eb0000030ffc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d0000030f000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000010f0000030ffc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003d0000030f000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000060f0000003efc0100000002fb0000000800540069006d006501000000000000060f000002eb00fffffffb0000000800540069006d00650100000000000004500000000000000000000003090000030f00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -248,5 +348,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1551
-  X: 147
+  X: 179
   Y: 109

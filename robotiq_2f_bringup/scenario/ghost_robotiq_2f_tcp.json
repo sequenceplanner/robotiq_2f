@@ -1,0 +1,34 @@
+{
+    "show": true,
+    "active": false,
+    "child_frame_id": "ghost_robotiq_2f_tcp",
+    "parent_frame_id": "ghost_robotiq_2f_base_link",
+    "transform": {
+        "translation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.15
+        },
+        "rotation": {
+            "x": 1.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 0.0
+        }
+    },
+    "visualization": {
+        "mesh": "",
+        "show_mesh": false,
+        "interactive": false,
+        "quantity": 1.0,
+        "marker_scale": 0.2,
+        "fixed_marker": false,
+        "scale_x": 0.001,
+        "scale_y": 0.001,
+        "scale_z": 0.001,
+        "color_a": 1.0,
+        "color_r": 0.2,
+        "color_g": 0.2,
+        "color_b": 0.2
+    }
+}
