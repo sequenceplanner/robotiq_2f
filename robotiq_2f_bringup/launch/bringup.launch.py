@@ -14,7 +14,7 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     dir = FindPackageShare("robotiq_2f_bringup").find("robotiq_2f_bringup")
-    description_dir = FindPackageShare("robotiq_2f_description").find("robotiq_2f_description")
+    robotiq_description_dir = FindPackageShare("robotiq_2f_description").find("robotiq_2f_description")
 
     scenario_path = {
         "scenario_path": os.path.join(dir, "scenario"), 
@@ -43,7 +43,7 @@ def generate_launch_description():
         [
             PathJoinSubstitution([FindExecutable(name="xacro")]),
             " ",
-            os.path.join(description_dir, "urdf", "robotiq_2f_85_model.xacro")
+            os.path.join(robotiq_description_dir, "urdf", "robotiq_2f_85_model.xacro")
         ]
     )
 
@@ -51,7 +51,7 @@ def generate_launch_description():
         [
             PathJoinSubstitution([FindExecutable(name="xacro")]),
             " ",
-            os.path.join(description_dir, "urdf", "robotiq_2f_85_model.xacro"),
+            os.path.join(robotiq_description_dir, "urdf", "ghost_robotiq_2f_85_model.xacro"),
             " ",
             "prefix:=ghost_"
         ]
