@@ -55,7 +55,7 @@ def generate_launch_description():
     rviz_config_file = os.path.join(dir, "config", "bringup.rviz")
 
     robot_parameters = {
-        "urdf_raw": os.path.join(description_dir, "urdf", "robotiq_2f_85_model.xacro"),
+        "urdf_raw": robot_description_content,
         # "initial_joint_state": ["0.0", "-1.5707", "1.5707", "-1.5707", "-1.5707", "0.0"],
         "initial_base_link_id": "robotiq_2f_base_link",
         "initial_face_plate_id": "left_inner_finger_pad",
