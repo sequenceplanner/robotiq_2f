@@ -1,6 +1,6 @@
 use micro_sp::*;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
+use std::{env::VarError, error::Error};
 
 use std::io;
 use std::net::TcpStream;
@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .expect("UR_PORT is not set")
         .parse()
         .unwrap();
-    // let override_host_address = std::env::var("OVERRIDE_HOST_ADDRESS");
+    let override_host_address = std::env::var("OVERRIDE_HOST_ADDRESS");
     let gripper_id = std::env::var("GRIPPER_ID").expect("GRIPPER_ID is not set");
     let log_target = format!("{}_rq_2f_script_driver", gripper_id);
 
@@ -127,7 +127,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                 };
 
-                match send_gripper_script(&ur_address, ur_port, &script) {
+                match send_gripper_script(&ur_address, override_host_address.clone(), ur_port, &script) {
                     Ok(_) => request_state = ActionRequestState::Succeeded.to_string(),
                     Err(_) => request_state = ActionRequestState::Failed.to_string(),
                 }
@@ -182,15 +182,15 @@ fn generate_script(
 
 fn send_gripper_script(
     host: &str,
-    // override_host_address: Result<String, VarError>,
+    override_host_address: Result<String, VarError>,
     port: u16,
     script_content: &str,
 ) -> io::Result<u64> {
-    // let server_address = match override_host_address {
-    //     Ok(addr) => format!("{}:{}", addr, port),
-    //     Err(_) => format!("{}:{}", host, port),
-    // };
-    let server_address = format!("{}:{}", host, port);
+    let server_address = match override_host_address {
+        Ok(addr) => format!("{}:{}", addr, port),
+        Err(_) => format!("{}:{}", host, port),
+    };
+    // let server_address = format!("{}:{}", host, port);
     let mut stream = TcpStream::connect(server_address)?;
     let mut reader = script_content.as_bytes();
     io::copy(&mut reader, &mut stream)
