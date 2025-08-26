@@ -1,0 +1,12 @@
+[package]
+name = "robotiq_2f_urscript"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+log = "0.4.22"
+tera = "1.20.0"
+micro_sp = { git = "https://github.com/endre90/micro_sp", branch = "master" }
+tokio = { version = "1.43.0", features = ["full"] }
+serde_json = "1.0.127"
+serde = { version = "1.0.217", features = ["derive"] }
