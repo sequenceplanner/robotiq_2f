@@ -6,7 +6,7 @@ use std::io;
 use std::net::TcpStream;
 use tokio::time::{Duration, interval};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GripperCommand {
     // open, close, move_to, set force, activate, etc...
     pub command_type: String,
@@ -25,12 +25,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .expect("UR_PORT is not set")
         .parse()
         .unwrap();
+    // let override_host_address = std::env::var("OVERRIDE_HOST_ADDRESS");
     let gripper_id = std::env::var("GRIPPER_ID").expect("GRIPPER_ID is not set");
     let log_target = format!("{}_rq_2f_script_driver", gripper_id);
 
     let state = generate_gripper_interface_state(&gripper_id);
-    let connection_manager = ConnectionManager::new().await;
-    StateManager::set_state(&mut connection_manager.get_connection().await, &state).await;
+    // let connection_manager = ConnectionManager::new().await;
+    // StateManager::set_state(&mut connection_manager.get_connection().await, &state).await;
 
     let templates: tera::Tera = {
         let tera = match tera::Tera::new(&format!("{}/*.script", templates_dir)) {
@@ -90,13 +91,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if request_trigger {
             request_trigger = false;
             if request_state == ActionRequestState::Initial.to_string() {
+                
                 let command_type = state.get_string_or_default_to_unknown(
                     &format!("{gripper_id}_command_type"),
                     &log_target,
                 );
 
-                let velocity = state
-                    .get_float_or_value(&format!("{gripper_id}_velocity"), 1.0, &log_target);
+                let velocity =
+                    state.get_float_or_value(&format!("{gripper_id}_velocity"), 1.0, &log_target);
 
                 let force =
                     state.get_float_or_value(&format!("{gripper_id}_force"), 1.0, &log_target);
@@ -112,6 +114,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     force,
                     ref_pos_percentage,
                 };
+
+                log::info!(target: &log_target,
+                                "Got command to: {:?} ", gripper_command);
 
                 let script = match generate_script(gripper_command, &templates, &log_target) {
                     Ok(script) => script,
@@ -175,7 +180,16 @@ fn generate_script(
     }
 }
 
-fn send_gripper_script(host: &str, port: u16, script_content: &str) -> io::Result<u64> {
+fn send_gripper_script(
+    host: &str,
+    // override_host_address: Result<String, VarError>,
+    port: u16,
+    script_content: &str,
+) -> io::Result<u64> {
+    // let server_address = match override_host_address {
+    //     Ok(addr) => format!("{}:{}", addr, port),
+    //     Err(_) => format!("{}:{}", host, port),
+    // };
     let server_address = format!("{}:{}", host, port);
     let mut stream = TcpStream::connect(server_address)?;
     let mut reader = script_content.as_bytes();
