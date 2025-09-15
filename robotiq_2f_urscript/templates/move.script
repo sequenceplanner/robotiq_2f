@@ -13,7 +13,7 @@ def gripper():
   PRE = 11
   
   def rq_init_connection(gripper_sid=9, gripper_socket="1"):
-  	socket_open("127.0.0.1",63352, gripper_socket)
+  	socket_open({{ host_address }}, {{ gripper_port }}, gripper_socket)
   	socket_set_var("SID", gripper_sid,  gripper_socket)
   	ack = socket_read_byte_list(3, gripper_socket)
   end
@@ -649,5 +649,7 @@ def gripper():
   current_speed = [-1,-1,-1,-1]
   current_force = [-1,-1,-1,-1]
   
+  rq_set_force_norm({{ force }})
+  rq_set_speed_norm({{ velocity }})
   rq_move_and_wait_norm({{ ref_pos_percentage }})
 end

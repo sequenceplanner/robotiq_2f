@@ -1,6 +1,6 @@
 use micro_sp::*;
 use serde::{Deserialize, Serialize};
-use std::{env::VarError, error::Error};
+use std::error::Error;
 
 use std::io;
 use std::net::TcpStream;
@@ -13,6 +13,8 @@ pub struct GripperCommand {
     pub velocity: f64,
     pub force: f64,
     pub ref_pos_percentage: i64, // fully closed: 100, fully open 0, or anything inbetween
+    pub host_address: String,
+    pub gripper_port: u64,
 }
 
 #[tokio::main]
@@ -22,10 +24,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let templates_dir = std::env::var("TEMPLATES_DIR").expect("TEMPLATES_DIR is not set");
     let ur_address = std::env::var("UR_ADDRESS").expect("UR_ADDRESS is not set");
     let ur_port = std::env::var("UR_PORT")
-        .expect("UR_PORT is not set")
-        .parse()
-        .unwrap();
-    let override_host_address = std::env::var("OVERRIDE_HOST_ADDRESS");
+        .unwrap_or("50000".to_string())
+        .parse::<u64>()
+        .unwrap_or(50000);
+    let gripper_port = std::env::var("GRIPPER_PORT")
+        .unwrap_or("63352".to_string())
+        .parse::<u64>()
+        .unwrap_or(63352);
+    let override_host_address =
+        std::env::var("OVERRIDE_HOST_ADDRESS").unwrap_or("127.0.0.1".to_string());
     let gripper_id = std::env::var("GRIPPER_ID").expect("GRIPPER_ID is not set");
     let log_target = format!("{}_rq_2f_script_driver", gripper_id);
 
@@ -91,7 +98,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if request_trigger {
             request_trigger = false;
             if request_state == ActionRequestState::Initial.to_string() {
-                
                 let command_type = state.get_string_or_default_to_unknown(
                     &format!("{gripper_id}_command_type"),
                     &log_target,
@@ -113,6 +119,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     velocity,
                     force,
                     ref_pos_percentage,
+                    host_address: override_host_address.clone(),
+                    gripper_port,
                 };
 
                 log::info!(target: &log_target,
@@ -127,7 +135,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                 };
 
-                match send_gripper_script(&ur_address, override_host_address.clone(), ur_port, &script) {
+                match send_gripper_script(
+                    &ur_address,
+                    ur_port,
+                    &script,
+                ) {
                     Ok(_) => request_state = ActionRequestState::Succeeded.to_string(),
                     Err(_) => request_state = ActionRequestState::Failed.to_string(),
                 }
@@ -181,16 +193,12 @@ fn generate_script(
 }
 
 fn send_gripper_script(
-    host: &str,
-    override_host_address: Result<String, VarError>,
-    port: u16,
+    ur_address: &str,
+    ur_port: u64,
     script_content: &str,
 ) -> io::Result<u64> {
-    let server_address = match override_host_address {
-        Ok(addr) => format!("{}:{}", addr, port),
-        Err(_) => format!("{}:{}", host, port),
-    };
-    // let server_address = format!("{}:{}", host, port);
+    println!("{:#}",  script_content);
+    let server_address = format!("{}:{}", ur_address, ur_port);
     let mut stream = TcpStream::connect(server_address)?;
     let mut reader = script_content.as_bytes();
     io::copy(&mut reader, &mut stream)
@@ -221,3 +229,53 @@ pub fn generate_gripper_interface_state(gripper_id: &str) -> State {
 
     state
 }
+
+///// Takes the original UR script to call and wraps it in handshaking
+///// using socket communication to the host (caller).
+// fn generate_ur_script(original: &str, host_address: &str) -> String {
+//     let indented_script: String = original.lines().map(|l| format!("  {l}")).collect::<Vec<String>>().join("\n");
+
+//     let pre_script = r#"
+// def run_script():
+// "#.to_string();
+
+//     let post_script_1 = r#"
+
+//   def handshake():
+// "#.to_string();
+
+//     let post_script_2 = format!("    socket_open(\"{}\", 50000, \"ur_driver_socket\")", host_address);
+
+//     let post_script_3 = r#"
+//     line_from_server = socket_read_line("ur_driver_socket", timeout=1.0)
+//     if(str_empty(line_from_server)):
+//       return False
+//     else:
+//       socket_send_line(line_from_server, "ur_driver_socket")
+//       return True
+//     end
+//   end
+
+//   if(handshake()):
+//     result = script()
+//     if(result):
+//       socket_send_line("ok", "ur_driver_socket")
+//     else:
+//       socket_send_line("error", "ur_driver_socket")
+//     end
+//   else:
+// "#.to_string();
+//     let post_script_4 = format!("    popup(\"handshake failure with host {}, not moving.\")", host_address);
+
+//     let post_script_5 = r#"
+//   end
+
+//   socket_close("ur_driver_socket")
+// end
+
+// run_script()
+// "#.to_string();
+
+//     return format!("{}{}{}{}{}{}{}", pre_script, indented_script, post_script_1,
+//                    post_script_2, post_script_3, post_script_4, post_script_5);
+// }
