@@ -10,8 +10,8 @@ use tokio::time::{Duration, interval};
 pub struct GripperCommand {
     // open, close, move_to, set force, activate, etc...
     pub command_type: String,
-    pub velocity: f64,
-    pub force: f64,
+    pub velocity: i64,
+    pub force: i64,
     pub ref_pos_percentage: i64, // fully closed: 100, fully open 0, or anything inbetween
     pub host_address: String,
     pub gripper_port: u64,
@@ -24,9 +24,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let templates_dir = std::env::var("TEMPLATES_DIR").expect("TEMPLATES_DIR is not set");
     let ur_address = std::env::var("UR_ADDRESS").expect("UR_ADDRESS is not set");
     let ur_port = std::env::var("UR_PORT")
-        .unwrap_or("50000".to_string())
+        .unwrap_or("30002".to_string())
         .parse::<u64>()
-        .unwrap_or(50000);
+        .unwrap_or(30002);
     let gripper_port = std::env::var("GRIPPER_PORT")
         .unwrap_or("63352".to_string())
         .parse::<u64>()
@@ -81,9 +81,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     StateManager::set_state(&mut con, &state).await;
     loop {
         interval.tick().await;
-        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
+        if let Err(_) = connection_manager.check_redis_health(&log_target, &state).await {
             continue;
         }
+        let mut con = connection_manager.get_connection().await;
         let state = match StateManager::get_state_for_keys(&mut con, &keys).await {
             Some(s) => s,
             None => continue,
@@ -104,10 +105,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 );
 
                 let velocity =
-                    state.get_float_or_value(&format!("{gripper_id}_velocity"), 1.0, &log_target);
+                    state.get_int_or_value(&format!("{gripper_id}_velocity"), 1, &log_target);
 
                 let force =
-                    state.get_float_or_value(&format!("{gripper_id}_force"), 1.0, &log_target);
+                    state.get_int_or_value(&format!("{gripper_id}_force"), 1, &log_target);
 
                 let ref_pos_percentage = state.get_int_or_default_to_zero(
                     &format!("{gripper_id}_ref_pos_percentage"),
