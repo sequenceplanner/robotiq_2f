@@ -81,11 +81,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     StateManager::set_state(&mut con, &state).await;
     loop {
         interval.tick().await;
-        if let Err(_) = connection_manager.check_redis_health(&log_target, &state).await {
+        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
         let mut con = connection_manager.get_connection().await;
-        let state = match StateManager::get_state_for_keys(&mut con, &keys).await {
+        let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,
         };
@@ -107,8 +107,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let velocity =
                     state.get_int_or_value(&format!("{gripper_id}_velocity"), 1, &log_target);
 
-                let force =
-                    state.get_int_or_value(&format!("{gripper_id}_force"), 1, &log_target);
+                let force = state.get_int_or_value(&format!("{gripper_id}_force"), 1, &log_target);
 
                 let ref_pos_percentage = state.get_int_or_default_to_zero(
                     &format!("{gripper_id}_ref_pos_percentage"),
@@ -136,11 +135,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                 };
 
-                match send_gripper_script(
-                    &ur_address,
-                    ur_port,
-                    &script,
-                ) {
+                match send_gripper_script(&ur_address, ur_port, &script) {
                     Ok(_) => request_state = ActionRequestState::Succeeded.to_string(),
                     Err(_) => request_state = ActionRequestState::Failed.to_string(),
                 }
@@ -193,12 +188,8 @@ fn generate_script(
     }
 }
 
-fn send_gripper_script(
-    ur_address: &str,
-    ur_port: u64,
-    script_content: &str,
-) -> io::Result<u64> {
-    println!("{:#}",  script_content);
+fn send_gripper_script(ur_address: &str, ur_port: u64, script_content: &str) -> io::Result<u64> {
+    println!("{:#}", script_content);
     let server_address = format!("{}:{}", ur_address, ur_port);
     let mut stream = TcpStream::connect(server_address)?;
     let mut reader = script_content.as_bytes();
